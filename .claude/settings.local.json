@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(ls /Users/garrettbolanos/projects/)",
+      "Bash(mkdir -p /Users/garrettbolanos/projects/roxhound-api/src/routes)"
+    ]
+  }
+}
