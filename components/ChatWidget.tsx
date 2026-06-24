@@ -11,8 +11,8 @@ type Mode = 'qualify' | 'quote'
 
 const MIN_W = 280
 const MIN_H = 320
-const MAX_W = 800
-const MAX_H = 900
+const MAX_W = 1600
+const MAX_H = 1200
 
 const SUGGESTIONS = [
   "I'm the bottleneck in my own business",
@@ -25,7 +25,14 @@ const SUGGESTIONS = [
 
 export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
   const [open, setOpen] = useState(false)
-  const [size, setSize] = useState({ w: 320, h: 480 })
+  const [size, setSize] = useState({ w: 600, h: 600 })
+
+  useEffect(() => {
+    setSize({
+      w: Math.round(window.innerWidth / 3) + 24,
+      h: Math.round(window.innerHeight * 0.6666),
+    })
+  }, [])
   const bottomRef = useRef<HTMLDivElement>(null)
   const accentColor = useAppStore((s) => s.accentColor)
   const phase = useAppStore((s) => s.phase)
@@ -36,6 +43,9 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
     api: `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api/chat`,
     maxSteps: 5,
     body: { mode },
+    headers: process.env.NEXT_PUBLIC_CHAT_SECRET
+      ? { 'x-chat-secret': process.env.NEXT_PUBLIC_CHAT_SECRET }
+      : undefined,
     async onToolCall({ toolCall }) {
       const store = useAppStore.getState()
       const args = toolCall.args as Record<string, unknown>
@@ -144,110 +154,109 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
         </form>
       </motion.div>
 
-      {/* Chat widget — bottom right */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
-        <AnimatePresence>
-          {phase === 'chat' && open && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.25 }}
-              className="bg-black/80 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl relative"
-              style={{ width: size.w, height: size.h }}
-            >
-              <div onMouseDown={onMouseDown} className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-10 group">
-                <svg width="12" height="12" viewBox="0 0 12 12" className="absolute top-1.5 left-1.5 opacity-20 group-hover:opacity-60 transition-opacity rotate-180">
-                  <path d="M10 2 L2 2 L2 10" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+      {/* Chat panel — floating, default ~50% width */}
+      <AnimatePresence>
+        {phase === 'chat' && open && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.25 }}
+            className="fixed bottom-6 right-6 z-40 bg-black/80 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl"
+            style={{ width: size.w, height: size.h }}
+          >
+            <div onMouseDown={onMouseDown} className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-10 group">
+              <svg width="12" height="12" viewBox="0 0 12 12" className="absolute top-1.5 left-1.5 opacity-20 group-hover:opacity-60 transition-opacity rotate-180">
+                <path d="M10 2 L2 2 L2 10" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
 
-              <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2 shrink-0">
-                <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
-                <span className="text-white text-sm font-medium">Roxhound AI</span>
-              </div>
+            <div className="px-6 py-4 border-b border-white/10 flex items-center gap-2 shrink-0">
+              <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
+              <span className="text-white text-sm font-medium">Roxhound AI</span>
+            </div>
 
-              <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3 min-h-0">
-                {messages.length === 0 && (
-                  <p className="text-white/40 text-sm text-center mt-8">Starting your qualification...</p>
-                )}
-                {messages.map((m) => {
-                  const pkg = m.toolInvocations?.find((t) => t.toolName === 'renderPackage' && t.state === 'result')
-                  return (
-                    <div key={m.id} className={`flex flex-col gap-2 ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      {pkg && <div className="w-full"><PackageCard data={pkg.args as PackageData} /></div>}
-                      {(m.content || !pkg) && (
-                        <div
-                          className="max-w-[90%] px-3 py-2 rounded-xl text-sm leading-relaxed text-white"
-                          style={m.role === 'user' ? { background: accentColor } : { background: 'rgba(255,255,255,0.1)' }}
-                        >
-                          {m.role === 'user' ? m.content : (
-                            <ReactMarkdown components={{
-                              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                              strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-                              ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-2">{children}</ul>,
-                              ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2">{children}</ol>,
-                              li: ({ children }) => <li className="text-white/90">{children}</li>,
-                              h1: ({ children }) => <h1 className="font-bold text-base mb-1">{children}</h1>,
-                              h2: ({ children }) => <h2 className="font-semibold text-sm mb-1 text-white/80 uppercase tracking-wide">{children}</h2>,
-                              h3: ({ children }) => <h3 className="font-semibold text-sm mb-1">{children}</h3>,
-                              hr: () => <hr className="border-white/10 my-2" />,
-                              code: ({ children }) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                            }}>
-                              {m.content || (m.toolInvocations?.length ? '…' : '')}
-                            </ReactMarkdown>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-white/10 text-white/40 px-3 py-2 rounded-xl text-sm">…</div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3 min-h-0">
+              {messages.length === 0 && (
+                <p className="text-white/40 text-sm text-center mt-12">Starting your qualification...</p>
+              )}
+              {messages.map((m) => {
+                const pkg = m.toolInvocations?.find((t) => t.toolName === 'renderPackage' && t.state === 'result')
+                return (
+                  <div key={m.id} className={`flex flex-col gap-2 ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    {pkg && <div className="w-full"><PackageCard data={pkg.args as PackageData} /></div>}
+                    {(m.content || !pkg) && (
+                      <div
+                        className="max-w-[85%] px-4 py-2.5 rounded-xl text-sm leading-relaxed text-white"
+                        style={m.role === 'user' ? { background: accentColor } : { background: 'rgba(255,255,255,0.08)' }}
+                      >
+                        {m.role === 'user' ? m.content : (
+                          <ReactMarkdown components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                            ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-2">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-2">{children}</ol>,
+                            li: ({ children }) => <li className="text-white/90">{children}</li>,
+                            h1: ({ children }) => <h1 className="font-bold text-base mb-1">{children}</h1>,
+                            h2: ({ children }) => <h2 className="font-semibold text-sm mb-1 text-white/80 uppercase tracking-wide">{children}</h2>,
+                            h3: ({ children }) => <h3 className="font-semibold text-sm mb-1">{children}</h3>,
+                            hr: () => <hr className="border-white/10 my-2" />,
+                            code: ({ children }) => <code className="bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                          }}>
+                            {m.content || (m.toolInvocations?.length ? '…' : '')}
+                          </ReactMarkdown>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-                <div ref={bottomRef} />
-              </div>
-
-              <form onSubmit={handleSubmit} className="px-3 py-3 border-t border-white/10 shrink-0">
-                <div className="flex gap-2">
-                  <input
-                    value={input}
-                    onChange={handleInputChange}
-                    placeholder="Ask anything..."
-                    className="flex-1 bg-white/10 text-white text-sm placeholder-white/30 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-white/40"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isLoading || !input.trim()}
-                    className="text-white rounded-lg px-3 py-2 text-sm transition-opacity disabled:opacity-40"
-                    style={{ background: accentColor }}
-                  >
-                    ↑
-                  </button>
+                )
+              })}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white/10 text-white/40 px-4 py-2.5 rounded-xl text-sm">…</div>
                 </div>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              )}
+              <div ref={bottomRef} />
+            </div>
 
-        <AnimatePresence>
-          {phase === 'chat' && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setOpen((o) => !o)}
-              className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:opacity-80 transition-opacity"
-              style={{ background: accentColor }}
-            >
-              <span className="text-white text-lg leading-none">{open ? '×' : '💬'}</span>
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
+            <form onSubmit={handleSubmit} className="px-4 py-4 border-t border-white/10 shrink-0">
+              <div className="flex gap-2">
+                <input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Ask anything..."
+                  className="flex-1 bg-white/10 text-white text-sm placeholder-white/30 rounded-lg px-4 py-2.5 outline-none focus:ring-1 focus:ring-white/20"
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading || !input.trim()}
+                  className="text-white rounded-lg px-4 py-2.5 text-sm transition-opacity disabled:opacity-40"
+                  style={{ background: accentColor }}
+                >
+                  ↑
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toggle button — bottom right */}
+      <AnimatePresence>
+        {phase === 'chat' && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setOpen((o) => !o)}
+            className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:opacity-80 transition-opacity"
+            style={{ background: accentColor }}
+          >
+            <span className="text-white text-lg leading-none">{open ? '×' : '💬'}</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Chips — sticky footer */}
       <motion.div
