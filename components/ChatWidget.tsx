@@ -4,6 +4,7 @@ import { useChat } from 'ai/react'
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
+import Image from 'next/image'
 import { useAppStore, type Shape } from '@/store/useAppStore'
 import PackageCard, { type PackageData } from '@/components/PackageCard'
 
@@ -25,14 +26,25 @@ const SUGGESTIONS = [
 
 export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
   const [open, setOpen] = useState(false)
-  const [size, setSize] = useState({ w: 600, h: 600 })
+  const [isMobile, setIsMobile] = useState(false)
+  const [size, setSize] = useState({ w: 480, h: 600 })
 
   useEffect(() => {
-    setSize({
-      w: Math.round(window.innerWidth / 3) + 24,
-      h: Math.round(window.innerHeight * 0.6666),
-    })
+    const update = () => {
+      const mobile = window.innerWidth < 640
+      setIsMobile(mobile)
+      if (!mobile) {
+        setSize({
+          w: Math.min(480, Math.round(window.innerWidth * 0.45)),
+          h: Math.round(window.innerHeight * 0.72),
+        })
+      }
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
   }, [])
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const accentColor = useAppStore((s) => s.accentColor)
   const phase = useAppStore((s) => s.phase)
@@ -113,10 +125,7 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
         transition={{ duration: 0.3 }}
         className="fixed top-0 left-0 right-0 z-50 flex items-center px-8 py-4 bg-black/40 backdrop-blur-sm"
       >
-        <div className="flex items-center gap-2 font-semibold text-base text-white">
-          <div className="w-5 h-5 rounded-full border border-white/40" />
-          Roxhound
-        </div>
+        <Image src="/logo.PNG" alt="Roxhound" width={36} height={36} />
       </motion.header>
 
       {/* Landing — centered prompt box */}
@@ -134,7 +143,8 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
             onChange={handleInputChange}
             placeholder="Tell me what's happening in your business..."
             rows={3}
-            className="w-full resize-none bg-transparent text-white placeholder-white/25 text-sm outline-none px-5 pt-5 pb-2"
+            style={{ fontSize: 16 }}
+            className="w-full resize-none bg-transparent text-white placeholder-white/25 outline-none px-5 pt-5 pb-2"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && input.trim()) {
                 e.preventDefault()
@@ -154,7 +164,7 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
         </form>
       </motion.div>
 
-      {/* Chat panel — floating, default ~50% width */}
+      {/* Chat panel */}
       <AnimatePresence>
         {phase === 'chat' && open && (
           <motion.div
@@ -162,21 +172,33 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
             transition={{ duration: 0.25 }}
-            className="fixed bottom-6 right-6 z-40 bg-black/80 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl"
-            style={{ width: size.w, height: size.h }}
+            className={
+              isMobile
+                ? 'fixed inset-0 z-40 bg-black flex flex-col overflow-hidden'
+                : 'fixed bottom-6 right-6 z-40 bg-black/80 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl'
+            }
+            style={isMobile ? undefined : { width: size.w, height: size.h }}
           >
-            <div onMouseDown={onMouseDown} className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-10 group">
-              <svg width="12" height="12" viewBox="0 0 12 12" className="absolute top-1.5 left-1.5 opacity-20 group-hover:opacity-60 transition-opacity rotate-180">
-                <path d="M10 2 L2 2 L2 10" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            {/* Drag handle — desktop only */}
+            {!isMobile && (
+              <div onMouseDown={onMouseDown} className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-10 group">
+                <svg width="12" height="12" viewBox="0 0 12 12" className="absolute top-1.5 left-1.5 opacity-20 group-hover:opacity-60 transition-opacity rotate-180">
+                  <path d="M10 2 L2 2 L2 10" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
+                <span className="text-white text-sm font-medium">Roxhound AI</span>
+              </div>
+              {isMobile && (
+                <button onClick={() => setOpen(false)} className="text-white/50 hover:text-white text-2xl leading-none px-1">×</button>
+              )}
             </div>
 
-            <div className="px-6 py-4 border-b border-white/10 flex items-center gap-2 shrink-0">
-              <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
-              <span className="text-white text-sm font-medium">Roxhound AI</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3 min-h-0">
+            <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 min-h-0">
               {messages.length === 0 && (
                 <p className="text-white/40 text-sm text-center mt-12">Starting your qualification...</p>
               )}
@@ -219,18 +241,23 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
               <div ref={bottomRef} />
             </div>
 
-            <form onSubmit={handleSubmit} className="px-4 py-4 border-t border-white/10 shrink-0">
+            <form
+              onSubmit={handleSubmit}
+              className="px-4 py-3 border-t border-white/10 shrink-0"
+              style={isMobile ? { paddingBottom: 'max(12px, env(safe-area-inset-bottom))' } : undefined}
+            >
               <div className="flex gap-2">
                 <input
                   value={input}
                   onChange={handleInputChange}
                   placeholder="Ask anything..."
-                  className="flex-1 bg-white/10 text-white text-sm placeholder-white/30 rounded-lg px-4 py-2.5 outline-none focus:ring-1 focus:ring-white/20"
+                  style={{ fontSize: 16 }}
+                  className="flex-1 bg-white/10 text-white placeholder-white/30 rounded-lg px-4 py-3 outline-none focus:ring-1 focus:ring-white/20"
                 />
                 <button
                   type="submit"
                   disabled={isLoading || !input.trim()}
-                  className="text-white rounded-lg px-4 py-2.5 text-sm transition-opacity disabled:opacity-40"
+                  className="text-white rounded-lg px-4 py-3 text-sm transition-opacity disabled:opacity-40"
                   style={{ background: accentColor }}
                 >
                   ↑
@@ -241,19 +268,19 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
         )}
       </AnimatePresence>
 
-      {/* Toggle button — bottom right */}
+      {/* Toggle button — hidden when mobile panel is open */}
       <AnimatePresence>
-        {phase === 'chat' && (
+        {phase === 'chat' && !(isMobile && open) && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.2 }}
             onClick={() => setOpen((o) => !o)}
-            className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:opacity-80 transition-opacity"
-            style={{ background: accentColor }}
+            className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:opacity-80 transition-opacity"
+            style={{ background: accentColor, marginBottom: 'env(safe-area-inset-bottom)' }}
           >
-            <span className="text-white text-lg leading-none">{open ? '×' : '💬'}</span>
+            <span className="text-white text-xl leading-none">{open ? '×' : '💬'}</span>
           </motion.button>
         )}
       </AnimatePresence>
