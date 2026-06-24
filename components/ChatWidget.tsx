@@ -125,7 +125,7 @@ export default function ChatWidget({ mode = 'qualify' }: { mode?: Mode }) {
         transition={{ duration: 0.3 }}
         className="fixed top-0 left-0 right-0 z-50 flex items-center px-8 py-4 bg-black/40 backdrop-blur-sm"
       >
-        <Image src="/logo.PNG" alt="Roxhound" width={36} height={36} unoptimized />
+        <Image src="/logo.PNG" alt="Roxhound" width={40} height={40} unoptimized style={{ filter: 'invert(1)' }} />
       </motion.header>
 
       {/* Landing — centered prompt box */}
